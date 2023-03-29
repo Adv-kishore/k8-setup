@@ -24,72 +24,10 @@ example:  2.2.2.2.      k8node2.gonext.com       k8node2
 
 This step because all the 3 nodes should communicate each other.
  
-3. Pinging should do work and Enable ICMP V4 
-
-
-important:
-
-create a filename with firewall.sh
-and add the line no 35 to 57 inside the file
-and run the firewall.sh file 
-with following command 
-bash firewall.sh
-
-#!/bin/bash
-set -x
-firewall-cmd --permanent --add-port=6443/tcp
-firewall-cmd --permanent --add-port=2379-2380/tcp
-firewall-cmd --permanent --add-port=10250/tcp
-firewall-cmd --permanent --add-port=10251/tcp
-firewall-cmd --permanent --add-port=10252/tcp
-firewall-cmd --permanent --add-port=10255/tcp
-firewall-cmd --permanent --add-port=2181/tcp
-firewall-cmd --permanent --add-port=2888/tcp
-firewall-cmd --permanent --add-port=3888/tcp
-firewall-cmd --permanent --add-port=9092/tcp
-firewall-cmd --permanent --add-port=5473/tcp
-firewall-cmd --permanent --add-port=30000-32267/tcp
-firewall-cmd --permanent --add-port=179/tcp
-firewall-cmd --permanent --add-port=4789/udp
-firewall-cmd --permanent --add-port=8285/udp
-firewall-cmd --permanent --add-port=8472/udp
-firewall-cmd --zone=public --add-port=53/tcp --permanent
-firewall-cmd --zone=public --add-port=53/udp --permanent
-firewall-cmd --add-masquerade --permanent
-firewall-cmd --reload
-set +x 
-
-
-iptables -w -P FORWARD ACCEPT
-
-modprobe overlay
-modprobe br_netfilter
-tee /etc/sysctl.d/kubernetes.conf<<EOF
-net.bridge.bridge-nf-call-ip6tables = 1
-net.bridge.bridge-nf-call-iptables = 1
-net.ipv4.ip_forward = 1
-EOF
-sysctl --system
-
-
-cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
-[kubernetes]
-name=Kubernetes
-baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-exclude=kubelet kubeadm kubectl
-EOF
-
-
-
-4. Firewalld package should be installed in AWS Ubuntu OS, and Disabled.
+4. Firewalld package should be installed in AWS Linux OS, and Disabled.
    
-   install the package firewalld
+ ##install the package firewalld
    yum install firewalld -y 
-   
    systemctl status firewalld
    systemctl start firewalld
 
@@ -109,19 +47,45 @@ EOF
   modprobe br_netfilter
   cho '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
 
-*****
+7. Pinging should do work and Enable ICMP V4 important:
 
-cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+create a filename with firewall.sh and add the line no 54 to 66 inside the file and run the firewall.sh file with following command bash firewall.sh
+
+#!/bin/bash
+set -x
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=2379-2380/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10259/tcp
+firewall-cmd --permanent --add-port=10257/tcp
+firewall-cmd --permanent --add-port=179/tcp
+firewall-cmd --zone=public --add-port=53/tcp --permanent
+firewall-cmd --zone=public --add-port=53/udp --permanent
+firewall-cmd --add-masquerade --permanent
+firewall-cmd --reload
+set +x 
+
+8. After above cmd run below command to open IPv4 and IPv6 Tables : iptables -w -P FORWARD ACCEPT
+
+modprobe overlay
+modprobe br_netfilter
+tee /etc/sysctl.d/kubernetes.conf<<EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+sysctl --system
+
+*****
+cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
 [kubernetes]
 name=Kubernetes
 baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
 enabled=1
 gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 exclude=kubelet kubeadm kubectl
 EOF
-
 ******
 
 # firewall-cmd --permanent --add-port=6783/tcp
@@ -138,11 +102,12 @@ EOF
 
 12. Install the Kubeadm, kubelet , kubectl  in all 3 nodes
     
-   sudo yum install -y kubelet kubeadm kubectl
+   sudo yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
    
    ##sed -i 's/cgroup-driver=systemd/cgroup-driver=cgroupfs/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
    
 13. Check the version kubeadm
+     kubeadm version
 
 14. Start the kubelet and enable the services of kubelet
     Sudo systemctl start kubelet
@@ -154,39 +119,57 @@ EOF
 Only in Master node-Run the following commands and network add ons plugins in master node only.
 ================================================================================================
 
-#15. Add the environemnt details for Cgroup of dockers and kubelet for systems in a file kubernetes environmental file only in #master node
-#file name: 10.kubeadm.conf 
+#15. Add the environemnt details for Cgroup of dockers and kubelet for systems in a file kubernetes environmental file only in #master node file name: 10.kubeadm.conf 
 #path is: /etc/systemd/system/kubelet.service.d/10.kubeadm.conf
     
     #Environment="cgroup-driver=systemd/cgroup-driver=cgroupfs"
     
     systemctl restart docker && systemctl enable docker
-     systemctl  restart kubelet && systemctl enable kubelet
-     
-    
-
-
+    systemctl  restart kubelet && systemctl enable kubelet
 
 16. sudo kubeadm init --apiserver-advertise-address **PROVIDE IP ADDRESS of master node** --pod-network-cidr=192.168.0.0/16
        Or
       sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 
-17. kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+17.  ####   Your Kubernetes control-plane has initialized successfully!
 
+     ####  To start using your cluster, you need to run the following as a regular user:
 
-18.  mkdir -p $HOME/.kube
-     sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-     sudo chown $(id -u):$(id -g) $HOME/.kube/config
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-19. Run kubectl get nodes. To verify all the 3 nodes are active or not.
+     ##### Alternatively, if you are the root user, you can run:
 
-20. Kubectl get pods --all-namespaces
+  export KUBECONFIG=/etc/kubernetes/admin.conf
 
-21. Save the Generated token, with this token we have to join the worker nodes to master node
-   example:  kubeadm join 172.31.45.220:6443 --token 4dpaz7.1d4qr7d06m46ta2n     --discovery-token-ca-cert-hash       sha256:94d0de44045b5a94507a3586ff68532fc7da62f45841c72d22622dbc9a5d23be
+18. #### You should now deploy a pod network to the cluster. you have below 2 commands 
+
+     kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+       or
+    ## Install Calico with Kubernetes API datastore, 50 nodes or less
+    
+    curl https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml -O     
+
+19. ####  Save the Generated token, with this token we have to join the worker nodes to master node
+   example:  kubeadm join 172.31.45.220:6443 --token 4dpaz7.1d4qr7d06m46ta2n --discovery-token-ca-cert-hash       sha256:94d0de44045b5a94507a3586ff68532fc7da62f45841c72d22622dbc9a5d23be
    
+20. ####  if the  Generated token was missed , with the follwoing 2 methods you can get the token
+       1). kubeadm join IP of master 
+       2). kubeadm token list  or kubeadm token create 
+       3). openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | \
+   openssl dgst -sha256 -hex | sed 's/^.* //'
    
+       or 
+       
+    ####  simply write a below command
+       
+       kubeadm token create --print-join-command
    
+21. Run kubectl get nodes. To verify all the 3 nodes are active or not.
+
+      kubectl get pods --all-namespaces
+      kubectl get nods
    
    kubeadm init --apiserver-advertise-address=10.46.176.28 --pod-network-cidr=192.168.1.0/16
    https://phoenixnap.com/kb/how-to-install-kubernetes-on-centos
