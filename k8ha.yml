@@ -1,11 +1,41 @@
-yum install haproxy -y
-systemctl start haproxy
+For HA proxy set up we need to launch one Instance as a HAProxy and 3 K8S Master Nodes and worker nodes as required
 
-cd /etc/haproxy/haproxy.cfg
-add these two paragraphs
+In HAProxy instances:
+1). Install firewalld and service must be stopped.
+   Yum install firewalld
+   systemctl stop firewalld
+  
+2). In secuirty groups all TCP and IMCP IPv4 ports should be open.
+  	
+sgr-01f9fb9703466712d	IPv4	SSH	TCP	22	0.0.0.0/0	–
+
+–
+sgr-082d1c8a748a0233e	IPv4	All TCP	TCP	0 - 65535	0.0.0.0/0	–
+
+–
+sgr-09e86792c346c9500	IPv4	All ICMP - IPv4	ICMP	All
+
+3). now you must add K8 Masters IP in hosts file of HAProxy Server as well as K8S Master's Hosts File.
+
+  vi /etc/hosts
+  
+172.31.7.27     www.k8s.com     halb           ( Ex: IP Of HAProxy Server   DNS Name   HAProxy Hostname).
+172.31.12.51    www.k8s.com     k8master1      ( Ex: IP Of K8S Master1 Server   DNS Name   K8S Master1 Hostname).
+172.31.2.93     www.k8s.com     k8master2      ( Ex: IP Of K8S Master1 Server   DNS Name   K8S Master1 Hostname).
+172.31.2.205    www.k8s.com     k8master3      ( Ex: IP Of K8S Master1 Server   DNS Name   K8S Master1 Hostname).
+
+Save and exit  (:wq)
+
+4). Install haproxy
+
+    yum install haproxy -y
+    systemctl start haproxy
+5). you must add Frontend and Backend information in haproxy.cfg file
+
+   vi /etc/haproxy/haproxy.cfg
 
 frontend kubernetes-frontend
-   bind 172.31.38.170:6443
+   bind <IP of HAProxy>:6443
    mode tcp
    option tcplog
    default_backend kuberenetes-backend
@@ -15,23 +45,24 @@ backend kuberenetes-backend
     mode tcp
     option tcp-check
     balance roundrobin
-    server k8master1 172.31.46.7:6443 check fall 3 rise 2
-    server k8master2 172.31.33.242:6443 check fall 3 rise 2
-    server k8master3 172.31.34.242:6443 check fall 3 rise 2
+    server k8master1 <IP of K8S Master1>:6443 check fall 3 rise 2
+    server k8master2 <IP of K8S Master2>:6443 check fall 3 rise 2
+    server k8master3 <IP of K8S Master3>:6443 check fall 3 rise 2
 
 
 Here we are having 3 master nodes 
 
-run below command in master node1
+6). run below command in K8S Master-1
 
-note: kubeadm init --control-plane-endpoint="ha node ip":6443 --upload-certs --apiserver-advertise-address="masternodeip" --pod-network-cidr=192.168.0.0/16
+note: kubeadm init --control-plane-endpoint=<IP of HAProxy>:6443 --upload-certs --apiserver-advertise-address=<IP of K8S Master1> --pod-network-cidr=192.168.0.0/16
 
+7). Now 2 tokens will be generated in K8 Mater-1. one for joining Controller PLane and other for joining worker nodes.
 
-run below command in master node2
+8). run joining Controller PLane command in K8S Master-2&3.
 note: 
 kubeadm join "ha node ip":6443 --token lkmf0x.4ltqyerbpztykeua --discovery-token-ca-cert-hash sha256:9a94a7f2bcf2f18ef21359aff87f8183222ae7e877c5091d6c942bc50166d4d7 --control-plane --certificate-key e4e95bd5687e2de2b923b6789ede4274910e83793a44b800d9de6fd791f496f1  --apiserver-advertise-address="masternode2 ip"
 
-
-run below command in master node3
+9).
+run joining worker nodes command in K8S Worker nodes-1,2&3.
 note:
 kubeadm join "ha node ip":6443 --token lkmf0x.4ltqyerbpztykeua --discovery-token-ca-cert-hash sha256:9a94a7f2bcf2f18ef21359aff87f8183222ae7e877c5091d6c942bc50166d4d7 --control-plane --certificate-key e4e95bd5687e2de2b923b6789ede4274910e83793a44b800d9de6fd791f496f1  --apiserver-advertise-address="masternode3"
